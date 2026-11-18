@@ -1,0 +1,8 @@
+{
+  "name": "6a7",
+  "version": "0.3.0",
+  "private": true,
+  "description": "6a7 — futebol, estratégia e 67 sem limites",
+  "scripts": { "start": "node server.js", "test": "node test/run.js && node test/slots.js && node test/rig.js && node test/dev.js" },
+  "dependencies": { "express": "^4.21.2", "socket.io": "^4.8.1" }
+}
