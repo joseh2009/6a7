@@ -1,0 +1,13 @@
+"use strict";
+const assert = require("assert");
+const D = require("../lib/data");
+const e = D.BY_KEY.get("BRA-1994");
+const gk = e.squad.find(p => p.pos === "GOL"), ca = e.squad.find(p => p.pos === "CA");
+const slots = new Array(11).fill(null);
+assert.ok(D.fitsList(slots, "4-3-3", gk).every(i => D.FORMATIONS["4-3-3"][i][0] === "GOL"), "goleiro só vai no gol");
+assert.ok(D.fitsList(slots, "4-3-3", ca).length >= 1, "atacante tem vaga");
+slots[10] = gk;
+assert.ok(!D.fitsList(slots, "4-3-3", gk).includes(10), "vaga ocupada não aparece");
+const l = D.lineupFromSlots(slots, "4-3-3");
+assert.equal(l[10].name, gk.name); assert.equal(l[10].slot, "GOL"); assert.equal(l[0], null);
+console.log("  ok   vagas: encaixe por posição e ocupação");

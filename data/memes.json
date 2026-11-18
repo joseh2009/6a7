@@ -1,0 +1,35 @@
+[
+ {"sel":"MEM","copa":2026,"label":"Bichos da Internet","squad":[
+  {"id":"m-capivara","n":"Capivara Zen","pos":["GOL"],"num":1,"ovr":88,"lg":true,"fx":"wall"},
+  {"id":"m-caramelo","n":"Caramelo Caminhão","pos":["LD","MD"],"num":2,"ovr":80,"lg":false,"fx":"speed"},
+  {"id":"m-gato","n":"Gato Sumido","pos":["ZAG"],"num":3,"ovr":82,"lg":false,"fx":"wall"},
+  {"id":"m-pombo","n":"Pombo Soberano","pos":["ZAG"],"num":4,"ovr":79,"lg":false},
+  {"id":"m-sapo","n":"Sapo Kermitão","pos":["LE","ME"],"num":6,"ovr":77,"lg":false,"fx":"jump"},
+  {"id":"m-doge","n":"Doge Supremo","pos":["VOL","MEI"],"num":5,"ovr":84,"lg":true},
+  {"id":"m-pinguim","n":"Pinguim Deslizante","pos":["MEI","MD"],"num":8,"ovr":81,"lg":false,"fx":"speed"},
+  {"id":"m-ganso","n":"Ganso Terror","pos":["MEI","ME"],"num":10,"ovr":86,"lg":false,"fx":"power"},
+  {"id":"m-coelho","n":"Coelho Turbinado","pos":["PD","MD"],"num":7,"ovr":85,"lg":false,"fx":"speed"},
+  {"id":"m-bode","n":"Bode Cabeçada","pos":["CA"],"num":9,"ovr":90,"lg":true,"fx":"power"},
+  {"id":"m-macaco","n":"Macaco Malandro","pos":["PE","ME"],"num":11,"ovr":83,"lg":false,"fx":"jump"},
+  {"id":"m-pato","n":"Pato Mestre","pos":["GOL"],"num":12,"ovr":75,"lg":false},
+  {"id":"m-jacare","n":"Jacaré Zagueirão","pos":["ZAG","LD"],"num":13,"ovr":78,"lg":false,"fx":"wall"},
+  {"id":"m-lhama","n":"Lhama Furiosa","pos":["CA","PE"],"num":14,"ovr":80,"lg":false,"fx":"power"},
+  {"id":"m-tucano","n":"Tucano Bicudo","pos":["MEI","PD"],"num":15,"ovr":76,"lg":false}
+ ]},
+ {"sel":"MEM","copa":2022,"label":"Esquadrão do Meme","squad":[
+  {"id":"q-tiodopave","n":"Tio do Pavê","pos":["GOL"],"num":1,"ovr":80,"lg":false},
+  {"id":"q-pedreiro","n":"Pedreiro de Obra","pos":["LD","ZAG"],"num":2,"ovr":77,"lg":false,"fx":"wall"},
+  {"id":"q-tiaoze","n":"Tião Zagueirão","pos":["ZAG"],"num":3,"ovr":81,"lg":false,"fx":"wall"},
+  {"id":"q-vovo","n":"Vovô Mortal","pos":["ZAG","VOL"],"num":4,"ovr":79,"lg":false},
+  {"id":"q-nenem","n":"Neném Voador","pos":["LE","ME"],"num":6,"ovr":76,"lg":false,"fx":"jump"},
+  {"id":"q-cabecao","n":"Cabeção Man","pos":["VOL"],"num":5,"ovr":82,"lg":true,"fx":"power"},
+  {"id":"q-pipoqueiro","n":"Pipoqueiro Mágico","pos":["MEI"],"num":8,"ovr":84,"lg":false},
+  {"id":"q-mestre","n":"Mestre do Pix","pos":["MEI","MD"],"num":10,"ovr":87,"lg":true},
+  {"id":"q-moto","n":"Motoboy Relâmpago","pos":["PD","MD"],"num":7,"ovr":85,"lg":false,"fx":"speed"},
+  {"id":"q-artilheiro","n":"Artilheiro da Várzea","pos":["CA"],"num":9,"ovr":88,"lg":true,"fx":"power"},
+  {"id":"q-ponta","n":"Ponta Desengonçado","pos":["PE","ME"],"num":11,"ovr":80,"lg":false,"fx":"speed"},
+  {"id":"q-goleiro2","n":"Goleiro de Chinelo","pos":["GOL"],"num":12,"ovr":74,"lg":false},
+  {"id":"q-meia2","n":"Meia Dramático","pos":["MEI","ME"],"num":14,"ovr":78,"lg":false},
+  {"id":"q-atacante2","n":"Camisa 9 Fantasma","pos":["CA","PD"],"num":15,"ovr":79,"lg":false,"fx":"jump"}
+ ]}
+]

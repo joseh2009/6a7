@@ -1,0 +1,10 @@
+SKINS DO 6a7
+
+Para adicionar uma skin:
+1. Coloque a imagem PNG dentro desta pasta public/skins/.
+2. Abra public/app.js e encontre a lista de jogadores em DEFAULT_ROSTER.
+3. No jogador desejado, troque skinFile: null por skinFile: "nome-do-arquivo.png".
+4. Salve e atualize a página.
+
+Use PNG quadrado (64x64 ou 128x128), de preferência com o visual do personagem de frente.
+Se skinFile ficar como null, o jogador usa a aparência 3D padrão.

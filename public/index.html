@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>6a7 — Futebol, estratégia e diversão sem limites</title>
+<meta name="description" content="6a7: monte seleções históricas, dispute campeonatos, enfrente o caos e jogue a final em 3D.">
+<link id="pageIcon" rel="icon" type="image/png" href="/assets/logo-claro.png">
+<meta name="theme-color" content="#eef5fc">
+<link rel="stylesheet" href="style.css">
+</head>
+<body data-theme="light">
+<div id="app">
+  <header class="topbar">
+    <button class="brand" id="brandBtn" type="button" aria-label="6a7 início"><img id="brandLogo" src="/assets/logo-claro.png" alt=""><span>6<b>a7</b></span></button>
+    <div class="top-actions">
+      <span class="conn" id="connState"><i></i><span>conectando…</span></span>
+      <button class="ghost" id="muteBtn" type="button" aria-label="Som" title="Som">🔊</button>
+      <button class="ghost" data-theme-toggle type="button">TEMA ESCURO</button>
+    </div>
+  </header>
+
+  <!-- INÍCIO -->
+  <main id="home" class="screen">
+    <section class="hero">
+      <div class="eyebrow">FUTEBOL · ESTRATÉGIA · CAOS</div>
+      <h1>Um futebol diferente<br><em>de tudo que você já jogou.</em></h1>
+      <p>Monte seleções históricas de Copas do Mundo, dispute o campeonato de 16 seleções e jogue a final em 3D — ou entre no Caos.</p>
+    </section>
+    <section class="modes" aria-label="Modos de jogo">
+      <button class="mode active" data-mode="classic"><span class="n">01</span><b>CLÁSSICO</b><small>Campeonato de 16 seleções. A final é em 3D.</small></button>
+      <button class="mode" data-mode="almanaque"><span class="n">02</span><b>ALMANAQUE</b><small>Overalls escondidos. Confie no seu olho.</small></button>
+      <button class="mode chaos" data-mode="chaos"><span class="n">03</span><b>CAOS</b><small>Escolha seu elenco e veja 2 minutos de eventos absurdos.</small></button>
+      <button class="mode" data-mode="vsrelogio"><span class="n">04</span><b>VSRELÓGIO</b><small>Modo várzea: troque à vontade, sem espera.</small></button>
+      <button class="mode player" data-mode="player"><span class="n">05</span><b>JOGADOR</b><small>Você assume o controle na final.</small></button>
+    </section>
+    <p class="mode-desc" id="modeDesc"></p>
+    <section class="join card">
+      <label for="playerName">SEU NOME</label><input id="playerName" maxlength="18" autocomplete="nickname" placeholder="Seu apelido">
+      <label for="roomCode">CÓDIGO DA SALA</label><input id="roomCode" maxlength="8" autocapitalize="characters" placeholder="Ex.: FUTEBOL">
+      <div class="row"><button id="joinBtn" class="primary">ENTRAR NA SALA</button><button id="soloBtn" class="secondary">JOGAR SOZINHO</button></div>
+      <small id="homeStatus" role="status">Use o mesmo código para jogar com amigos. Sozinho, os bots completam o campeonato.</small>
+    </section>
+  </main>
+
+  <!-- SALA -->
+  <main id="lobby" class="screen hidden">
+    <div class="head"><div><div class="eyebrow">SALA DE JOGO</div><h2>SALA <span id="lobbyCode">------</span></h2></div><span class="pill" id="lobbyMode">CLÁSSICO</span></div>
+    <div class="two">
+      <section class="card"><h3>JOGADORES</h3><div id="roomPlayers" class="people"></div><p class="muted" id="lobbyHint"></p>
+        <div class="row"><button id="copyCode" class="secondary">COPIAR CÓDIGO</button><button id="copyLink" class="secondary">COPIAR LINK</button></div></section>
+      <section class="card"><h3>MODO</h3><div id="lobbyModes" class="chips"></div><p class="muted" id="lobbyModeDesc"></p>
+        <button id="startDraft" class="primary big">COMEÇAR</button><small class="muted" id="startHint"></small></section>
+    </div>
+    <section class="card kit"><h3>SEU UNIFORME</h3><div class="kit-row"><label>CAMISA<input type="color" id="kitShirt" value="#3a7be0"></label><label>CALÇÃO<input type="color" id="kitShorts" value="#ffffff"></label></div><div class="chips" id="kitPresets"></div><p class="muted">Aparece na partida 3D para todos na sala.</p></section>
+  </main>
+
+  <!-- SELEÇÃO -->
+  <main id="draft" class="screen hidden wide">
+    <div class="draft-top"><div class="turn" id="turnBox"></div><div class="counter"><span id="draftCount">0/11</span><small id="timerBox"></small></div></div>
+    <div class="draft-grid">
+      <aside class="card roll">
+        <div class="tact"><label>FORMAÇÃO</label><div class="chips" id="formChips"></div><label>ESTILO</label><div class="chips" id="styleChips"></div></div>
+        <div class="draw" id="drawBox"><small>SORTEIO</small><strong>Role para sortear</strong><span>uma seleção e uma Copa do Mundo</span></div>
+        <div class="row" id="rerollRow"><button id="rerollSel" class="secondary">↻ OUTRA SELEÇÃO</button><button id="rerollCup" class="secondary">↻ OUTRA COPA</button></div>
+        <button id="rollBtn" class="roll-btn">ROLAR <i>◆</i></button>
+        <div class="pool" id="pool"></div>
+        <p class="muted" id="draftHelp"></p>
+      </aside>
+      <section class="card pitch-card"><div class="pitch" id="pitch"><div class="pl h"></div><div class="pc"></div><div class="pb t"></div><div class="pb b"></div><div id="pitchSlots"></div></div></section>
+      <aside class="card box"><div class="box-head"><span>SEU ONZE</span><strong id="teamOvr">—</strong></div><div id="lineup"></div><div class="others" id="others"></div></aside>
+    </div>
+  </main>
+
+  <!-- CAMPEONATO -->
+  <main id="tour" class="screen hidden wide">
+    <div class="head"><div><div class="eyebrow" id="tourKicker">CAMPEONATO</div><h2 id="tourTitle">16 SELEÇÕES</h2></div><div class="row"><button id="nextStage" class="primary">COMEÇAR CAMPEONATO</button><button id="skipAnim" class="secondary hidden">PULAR</button><button id="againBtn" class="secondary hidden">JOGAR DE NOVO</button></div></div>
+    <div id="champion" class="champion hidden"></div>
+    <div class="tabs" id="tourTabs"></div>
+    <div id="tourBody"></div>
+  </main>
+
+  <!-- PARTIDA 3D -->
+  <main id="match" class="screen hidden wide">
+    <div class="scorebar"><div class="team t0"><b id="n0">—</b></div><div class="mid"><span id="s0">0</span><span class="clock" id="clock">02:00</span><span id="s1">0</span></div><div class="team t1"><b id="n1">—</b></div></div>
+    <div class="eyebrow center" id="matchKicker"></div>
+    <div class="cams"><button data-cam="orig" class="chip active">PANORÂMICA</button><button data-cam="follow" class="chip">ACOMPANHAR</button><button data-cam="first" class="chip">1ª PESSOA</button><button id="fsBtn" class="chip" type="button">TELA CHEIA</button></div>
+    <div id="stage"><div id="loading3d">Carregando estádio 3D…</div><div id="banner" class="banner hidden"></div><div id="goalFx" class="goalfx hidden"></div>
+      <div id="touch" class="touch hidden"><div id="stick"><i></i></div><div class="btns"><button id="bShoot">CHUTE</button><button id="bPass">PASSE</button><button id="bSwitch">TROCAR</button><button id="bRun">CORRER</button></div></div></div>
+    <div class="matchfoot"><span id="matchHint"></span></div>
+    <section id="result" class="result hidden"><div class="eyebrow">APITO FINAL</div><h2 id="resTitle"></h2><div class="res-score" id="resScore"></div><p id="resMsg"></p><ol id="resGoals"></ol><div class="row"><button id="resContinue" class="primary">CONTINUAR</button></div></section>
+  </main>
+</div>
+<div id="modal" class="modal hidden"><div class="modal-card" id="modalCard"></div></div>
+<div id="toast" role="status"></div>
+<script src="/socket.io/socket.io.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+<script src="js/engine.js"></script>
+<script src="js/core.js"></script>
+<script src="js/draft.js"></script>
+<script src="js/tour.js"></script>
+<script src="js/view3d.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
