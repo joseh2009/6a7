@@ -1,7 +1,19 @@
-# 6a7 — versão 0.9
+# 6a7 — versão 0.3
 
 Futebol em navegador: monte seleções históricas por sorteio, dispute o campeonato de 16 seleções e assista à final em 3D (ou jogue, no modo Jogador).
 
+## Como rodar
+
+```bash
+npm install
+npm start
+```
+
+Abra `http://localhost:3000`. Para testar a lógica: `npm test` (salas e fluxo) e `node test/engine-sim.js` (simulação da IA).
+
+Requer Node 18+ e internet na primeira abertura (Three.js e fontes vêm de CDN).
+
+## Modos
 
 - **Clássico**: 16 seleções em 4 grupos (3 rodadas) → quartas → semifinais → final 3D. Vagas sem jogador humano são preenchidas por bots.
 - **Almanaque**: mesmo campeonato, overalls ocultos durante o draft.
@@ -32,5 +44,3 @@ Futebol em navegador: monte seleções históricas por sorteio, dispute o campeo
 - O estado das salas fica em memória: reiniciar o servidor encerra as partidas.
 - A IA e o balanceamento foram ajustados por simulação, não por jogo humano extensivo.
 - Seleções de memes (`data/memes.json`) são um conjunto inicial de 2 elencos.
-- precisa ligar manualmente
-- 
