@@ -29,7 +29,7 @@ const View3D = (function () {
   }
   function seeded(seed) { let s = seed >>> 0 || 1; return () => { s += 0x6D2B79F5; let t = s; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
   function headless() { // sem 3D: o anfitrião ainda resolve a partida (acelerada) para ninguém ficar preso
-    const s = S; s.timer = setInterval(() => { if (!S || S !== s || s.ended) return clearInterval(s.timer); for (let i = 0; i < 40; i++) s.eng.step(1 / 60); for (const e of s.eng.drain()) if (e.type === "end") { s.ended = true; emit("match:end", { score: e.score, goals: e.goals }); } }, 30);
+    const s = S; s.timer = setInterval(() => { if (!S || S !== s || s.ended) return clearInterval(s.timer); for (let i = 0; i < 40; i++) s.eng.step(1 / 60); for (const e of s.eng.drain()) if (e.type === "end") { s.ended = true; emit("match:end", { score: e.score, goals: e.goals, stats: e.stats }); } }, 30);
   }
   function stop() {
     if (!S) return; S.dead = true; cancelAnimationFrame(S.raf); clearInterval(S.timer); window.removeEventListener("keydown", kd); window.removeEventListener("keyup", ku); window.removeEventListener("resize", onResize);
@@ -79,8 +79,9 @@ const View3D = (function () {
   }
   function buildGoals(scene) {
     const white = new THREE.MeshStandardMaterial({ color: 0xf6f6f2 }), net = new THREE.MeshBasicMaterial({ color: 0xffffff, wireframe: true, transparent: true, opacity: .28 });
+    S.goalGroups = [];
     for (const s of [-1, 1]) {
-      const g = new THREE.Group(), post = (z) => { const p = new THREE.Mesh(new THREE.BoxGeometry(.3, Engine.GOAL_H, .3), white); p.position.set(0, Engine.GOAL_H / 2, z); p.castShadow = true; g.add(p); };
+      const g = new THREE.Group(); S.goalGroups.push(g); const post = (z) => { const p = new THREE.Mesh(new THREE.BoxGeometry(.3, Engine.GOAL_H, .3), white); p.position.set(0, Engine.GOAL_H / 2, z); p.castShadow = true; g.add(p); };
       post(-GH); post(GH); const bar = new THREE.Mesh(new THREE.BoxGeometry(.3, .3, GH * 2 + .3), white); bar.position.y = Engine.GOAL_H; g.add(bar);
       const back = new THREE.Mesh(new THREE.BoxGeometry(.05, Engine.GOAL_H, GH * 2, 1, 6, 12), net); back.position.set(s * 3.2, Engine.GOAL_H / 2, 0); g.add(back);
       const top = new THREE.Mesh(new THREE.BoxGeometry(3.2, .05, GH * 2, 5, 1, 12), net); top.position.set(s * 1.6, Engine.GOAL_H, 0); g.add(top);
@@ -144,7 +145,7 @@ const View3D = (function () {
       st = eng.state(); if (S.frame % 3 === 0 && !S.ended) emit("match:snap", compact(st));
     } else st = interpolate(ts);
     if (st) { S.state = st; renderState(st, dt); hud(st); }
-    S.renderer.render(S.scene, S.camera);
+    if (!(st && st.fx && st.fx.includes("lag") && S.frame % 4)) S.renderer.render(S.scene, S.camera);
     if (!S.host && S.active) sendInput(ts);
   }
   function compact(st) { const r = v => Math.round(v * 100) / 100; return { t: r(st.t), left: r(st.left), score: st.score, golden: st.golden, pause: st.pause, total: st.total, quake: st.quake, youPlay: st.youPlay, fx: st.fx, players: st.players.map(p => p.map(r)), ball: st.ball.map(r), ents: st.ents.map(e => [e[0], r(e[1]), r(e[2]), r(e[3]), r(e[4]), r(e[5]), e[6]]) }; }
@@ -159,12 +160,19 @@ const View3D = (function () {
 
   // ---------------------------------------------------------------- render
   function renderState(st, dt) {
-    const cam = S.camera, ms = S.models, T = performance.now() / 1000;
+    const cam = S.camera, ms = S.models, T = performance.now() / 1000, fxs = st.fx || [];
+    // Meta móvel: as traves deslizam em z. Bola invisível: some visualmente (a colisão continua).
+    if (S.goalGroups) S.goalGroups.forEach(g => { g.position.z = st.goalZ || 0; });
+    const hideBall = fxs.includes("invisball"); S.ball.visible = !hideBall; S.blob.visible = !hideBall;
+    // Futebol de cabeça para baixo: a câmera gira 180°. Fim: céu escurece.
+    S.camera.up.set(0, fxs.includes("upside") ? -1 : 1, 0);
+    const dusk = fxs.includes("theend"); S.scene.background.setHex(dusk ? 0x1d1d2b : 0x8fc1ea); S.scene.fog.color.setHex(dusk ? 0x1d1d2b : 0x8fc1ea);
     st.players.forEach((p, i) => {
       const m = ms[i], dead = p[6] & 1; m.group.visible = !dead; if (dead) return;
       m.group.position.set(p[0], p[1], p[2]); m.group.scale.setScalar(p[7] || 1); m.group.rotation.y = p[3]; m.body.rotation.x = p[5] * (Math.PI / 2) * -1; m.body.position.y = p[5] * .6 - 0; m.group.rotation.z = 0;
       const sp = Math.min(1, p[4] / 8), sw = Math.sin(T * (8 + sp * 8) + m.phase) * (.15 + sp * .85) * .9; m.legL.rotation.x = sw; m.legR.rotation.x = -sw; m.armL.rotation.x = -sw * .9; m.armR.rotation.x = sw * .9;
-      m.head.scale.setScalar(p[6] & 2 ? 2.2 : 1); m.head.position.y = (p[6] & 2 ? 28 + 6 : 28) * .095; m.lab.position.y = p[6] & 2 ? 4.4 : 3.6; m.ring.visible = !!(p[6] & 4); if (p[6] & 4) m.ring.rotation.z = T * 2;
+      m.head.scale.setScalar(p[6] & 2 ? 2.2 : 1); m.head.position.y = (p[6] & 2 ? 28 + 6 : 28) * .095; m.lab.position.y = p[6] & 2 ? 4.4 : 3.6; m.ring.visible = !!(p[6] & 4) || !!(p[6] & 64); if (p[6] & 4) m.ring.rotation.z = T * 2; m.ring.scale.setScalar(p[6] & 64 ? 2.2 : 1);
+      if (p[6] & 32) { m.body.position.y += Math.abs(Math.sin(T * 8 + m.phase)) * .8; m.armL.rotation.x = -2.4 + Math.sin(T * 10) * .5; m.armR.rotation.x = -2.4 - Math.sin(T * 10) * .5; }
       if (p[6] & 8 && p[4] > 1) { m.armL.rotation.x = -.5; m.armR.rotation.x = .3; }
       if (p[6] & 16) { m.armL.rotation.x = -2.5; m.armR.rotation.x = -2.5; m.legL.rotation.x = .5; m.legR.rotation.x = -.5; }
     });
@@ -193,6 +201,8 @@ const View3D = (function () {
       if (S.wolf) { const m = new THREE.Mesh(S.wolf.geo, S.wolf.mat); m.castShadow = true; g.add(m); }
       else { const fur = new THREE.MeshLambertMaterial({ color: 0x8a5a32 }), box = (w, h, d, x, y, z) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), fur); m.position.set(x, y, z); m.castShadow = true; g.add(m); }; box(.7, .7, 1.5, 0, .85, 0); box(.6, .6, .6, 0, 1.2, .95); }
     }
+    else if (k === "miniball") { const m = new THREE.Mesh(new THREE.SphereGeometry(.3, 12, 8), new THREE.MeshStandardMaterial({ map: S.bt })); m.castShadow = true; g.add(m); }
+    else if (k === "snooker") { const m = new THREE.Mesh(new THREE.SphereGeometry(1.1, 16, 12), new THREE.MeshStandardMaterial({ color: 0x0e0e12, roughness: .25 })); m.castShadow = true; g.add(m); }
     else if (k === "torch") { const st = new THREE.Mesh(new THREE.BoxGeometry(.25, 3, .25), new THREE.MeshLambertMaterial({ color: 0x5b3a1e })); st.position.y = 1.5; g.add(st); const f = new THREE.Mesh(new THREE.ConeGeometry(.7, 1.6, 6), new THREE.MeshBasicMaterial({ color: 0xff7a18 })); f.position.y = 3.6; g.add(f); const pl = new THREE.PointLight(0xff8a30, 30, 18); pl.position.y = 3.6; g.add(pl); }
     else if (k === "flame") { const f = new THREE.Mesh(new THREE.ConeGeometry(.9, 1.8, 6), new THREE.MeshBasicMaterial({ color: 0xff5a10, transparent: true, opacity: .85 })); f.position.y = .9; g.add(f); const f2 = new THREE.Mesh(new THREE.ConeGeometry(.5, 1.1, 5), new THREE.MeshBasicMaterial({ color: 0xffd23a })); f2.position.y = .6; g.add(f2); }
     else return null; return g;
@@ -256,6 +266,7 @@ const View3D = (function () {
   function banner(html, cls, ms) { const b = $("banner"); b.className = "banner " + (cls || ""); b.innerHTML = html; clearTimeout(banner._t); banner._t = setTimeout(() => b.classList.add("hidden"), ms || 3500); }
   function handleEvent(e) {
     switch (e.type) {
+      case "shout": toast(e.text); break;
       case "goal": { const f = $("goalFx"); f.innerHTML = `<b>GOOOL!</b><span>${esc(e.player)} · ${e.minute}'</span>`; f.classList.remove("hidden"); setTimeout(() => f && f.classList.add("hidden"), 2600); Sound.goal(); break; }
       case "chaos": Sound.event(); if (e.name === "youplay") banner(`VOCÊ JOGA!<small>${S.myTeam >= 0 ? "Você controla os jogadores até o fim da partida!" : "Os participantes assumiram o controle!"}</small>`, "total", 5000); else banner(`${e.total ? "CAOS TOTAL · " : "EVENTO · "}${esc(e.label)}<small>${e.dur < 100 ? Math.round(e.dur) + " segundos" : ""}</small>`, e.total ? "total" : "", 3200); break;
       case "golden": banner(`GOL DE OURO!<small>O próximo gol decide a partida</small>`, "", 4000); Sound.whistle(); break;
@@ -265,10 +276,40 @@ const View3D = (function () {
       case "impact": burst(e.x, e.z, [0xffd21c, 0xb86a00], 12, 6); break;
     }
   }
-  function hostEvent(e) { handleEvent(e); if (e.type === "end") { if (!S.ended) { S.ended = true; emit("match:end", { score: e.score, goals: e.goals }); } return; } if (e.type !== "touch" && e.type !== "save" && e.type !== "kick") emit("match:event", { ...e, score: S.eng.score.slice() }); }
+  function hostEvent(e) { handleEvent(e); if (e.type === "end") { if (!S.ended) { S.ended = true; emit("match:end", { score: e.score, goals: e.goals, stats: e.stats }); } return; } if (e.type !== "touch" && e.type !== "save" && e.type !== "kick") emit("match:event", { ...e, score: S.eng.score.slice() }); }
   function onEvent(e) { if (S && !S.host) handleEvent(e); }
+  // Assume o motor quando o anfitrião cai: recria a partida a partir do último snapshot recebido.
+  function onTakeover(d) {
+    if (!S || S.ended || !d || !d.payload) return;
+    const pl = d.payload; S.payload = pl; S.host = true; S.myTeam = pl.controllers.indexOf(G.cid);
+    const eng = new Engine.Match({ kind: pl.kind, seconds: pl.seconds, chaos: pl.chaos, humanControl: pl.humanControl, teams: pl.teams }, { rng: seeded(pl.seed + 1), humans: pl.controllers.map(c => !!c) });
+    const sn = d.snap;
+    if (sn) {
+      eng.t = sn.t; eng.score = sn.score.slice(); eng.golden = !!sn.golden; eng.seconds = sn.t + (sn.left || 0);
+      (sn.fx || []).forEach(k => { eng.fx[k] = 5; });
+      sn.players.forEach((p, i) => { const q = eng.players[i]; if (q) { q.x = p[0]; q.z = p[2]; q.rot = p[3]; q.dead = !!(p[6] & 1); } });
+      eng.ball.x = sn.ball[0]; eng.ball.y = sn.ball[1]; eng.ball.z = sn.ball[2]; eng.ball.scale = sn.ball[3];
+    }
+    S.eng = eng; S.acc = 0; toast("A partida continua: você assumiu como anfitrião.");
+  }
+  // Estatísticas do fim da partida: resumo dos dois times, depois jogador a jogador com mapa de calor.
+  function renderStats(st, teams) {
+    const old = $("resStats"); if (old) old.remove();
+    if (!st || !st.teams || !st.players) return;
+    const box = document.createElement("div"); box.id = "resStats"; box.className = "res-stats";
+    const T = st.teams, row = (label, a, b) => `<tr><td>${a}</td><th>${label}</th><td>${b}</td></tr>`;
+    const tbl = `<table class="stat-table"><thead><tr><th>${esc(teams[0].name)}</th><th></th><th>${esc(teams[1].name)}</th></tr></thead><tbody>` +
+      row("Posse", T[0].possession + "%", T[1].possession + "%") + row("Chutes", T[0].shots, T[1].shots) + row("Defesas", T[0].saves, T[1].saves) +
+      row("Passes certos", `${T[0].passOk}/${T[0].passes} (${T[0].passPct}%)`, `${T[1].passOk}/${T[1].passes} (${T[1].passPct}%)`) +
+      row("Desarmes certos", `${T[0].tackleWon}/${T[0].tackles}`, `${T[1].tackleWon}/${T[1].tackles}`) + "</tbody></table>";
+    const cell = v => { const m = Math.max(...st.players.flatMap(p => p.heat)) || 1; return `<i style="opacity:${(0.08 + 0.92 * v / m).toFixed(2)}"></i>`; };
+    const players = st.players.map(p => `<details class="pl-stat"><summary><span style="color:${S.kits[p.team].shirt}">●</span> ${esc(p.name)} <small>${p.passOk}/${p.passes} passes · ${p.tackleWon}/${p.tackles} desarmes · ${p.dist} m</small></summary><div class="heat">${p.heat.map(cell).join("")}</div></details>`).join("");
+    box.innerHTML = tbl + '<h4>JOGADORES <small>· mapa de calor (da esquerda para a direita do campo)</small></h4><div class="pl-list">' + players + "</div>";
+    $("result").appendChild(box);
+  }
   function onEnd(r) {
     if (!S) return; S.ended = true; const t = S.payload.teams, rm = G.room;
+    renderStats(r.stats, S.payload.teams);
     $("result").classList.remove("hidden"); $("s0").textContent = r.score[0]; $("s1").textContent = r.score[1];
     const w = r.winner; $("resTitle").textContent = r.kind === "final" ? (w != null ? `CAMPEÃO: ${t[w].name.toUpperCase()}` : "FIM DE JOGO") : w == null ? "EMPATE" : `VITÓRIA · ${t[w].name.toUpperCase()}`;
     $("resScore").innerHTML = `${r.score[0]} × ${r.score[1]}`; $("resMsg").textContent = r.pens ? `Pênaltis: ${r.pens[0]} × ${r.pens[1]}` : r.forced ? "Partida encerrada pelo servidor." : "";

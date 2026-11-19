@@ -45,7 +45,7 @@ function connect() {
   G.cid = store.get("6a7Cid", null) || Math.random().toString(36).slice(2, 12) + Date.now().toString(36).slice(-4); store.set("6a7Cid", G.cid);
   if (typeof io === "undefined") { setConn("bad", "sem servidor"); toast("Não foi possível carregar o Socket.IO. Abra o jogo pelo servidor (npm start)."); return; }
   G.socket = io({ reconnectionDelayMax: 3000 });
-  G.socket.on("connect", () => { setConn("ok", "conectado"); if (G.room && G.room.code) G.socket.emit("joinRoom", { code: G.room.code, name: G.name, cid: G.cid }); });
+  G.socket.on("connect", () => { setConn("ok", "conectado"); if (G.room && G.room.code) G.socket.emit("joinRoom", { code: G.room.code, name: G.name, cid: G.cid, password: G.pass || "" }); });
   G.socket.on("disconnect", () => setConn("bad", "reconectando…"));
   G.socket.on("connect_error", () => setConn("bad", "sem conexão"));
   G.socket.on("notice", msg => { toast(msg); const s = $("homeStatus"); if (s && G.screen === "home") s.textContent = msg; });

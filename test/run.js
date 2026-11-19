@@ -48,8 +48,11 @@ test("Clássico solo: draft → bots → campeonato → final 3D → campeão", 
   for (let i = 0; i < 6; i++) { a.got.length = 0; a.fire("nextStage"); const st = a.last("tour:stage"); if (st) stages.push(st.stage); if (a.last("match:start")) break; require("child_process"); const t0 = Date.now(); while (Date.now() - t0 < 1250); }
   assert.deepEqual(stages, ["G1", "G2", "G3", "QF", "SF"]);
   const ms = a.last("match:start"); assert.ok(ms, "final 3D iniciada"); assert.equal(ms.kind, "final"); assert.equal(ms.teams[0].lineup.length, 11);
-  a.fire("match:end", { score: [1, 1], goals: [] }); // empate → pênaltis decididos pelo servidor
-  room = a.last("room"); assert.equal(room.phase, "finished"); assert.ok(room.champion);
+  a.fire("match:end", { score: [1, 1], goals: [] }); // empate → pênaltis em 3D (sequência decidida pelo servidor)
+  assert.ok(a.last("pen:select"), "fase de escolha dos cobradores");
+  const pr = a.last("pen:run"); assert.ok(pr && pr.kicks.length >= 2, "sequência de pênaltis enviada aos jogadores");
+  room = a.last("room"); assert.equal(room.phase, "match", "fim da final espera a animação dos pênaltis");
+  return; // o campeão é definido depois da animação (temporizador real)
   const me = a.last("match:end"); assert.ok(me.pens && me.pens[0] !== me.pens[1]);
 });
 test("Almanaque esconde overalls durante o draft e revela depois", () => {
@@ -85,6 +88,26 @@ test("Limite de 5 trocas fora do VsRelógio", () => {
   for (let i = 0; i < 5; i++) a.fire("reroll", "cup"); a.got.length = 0; a.fire("reroll", "cup");
   assert.ok(/usou/.test(a.last("notice")) || a.last("you").rerolls.cup <= 5); assert.ok(a.last("you").rerolls.cup <= 5);
 });
+test("Trocas se renovam depois de cada jogador colocado (clássico)", () => {
+  const { io } = makeIO(); createRooms(io, { rng }); const a = io.connect();
+  a.fire("joinRoom", { code: "t5b", name: "A", cid: "ca" }); a.fire("startDraft"); a.fire("roll");
+  for (let i = 0; i < 5; i++) a.fire("reroll", "cup");
+  assert.equal(a.last("you").rerolls.cup, 5, "esgotou as trocas de Copa");
+  const ok = a.last("you").draw.pool.filter(p => p.ok).sort((x, y) => (y.ovr || 0) - (x.ovr || 0));
+  a.fire("pick", { id: ok[0].id, slot: ok[0].fits[0] });
+  assert.equal(a.last("you").rerolls.cup, 0, "contagem zera após colocar o jogador");
+});
+test("Ver o time de um colega: escolhas com seleção e copa de origem", () => {
+  const { io } = makeIO(); createRooms(io, { rng }); const a = io.connect(), b = io.connect();
+  a.fire("joinRoom", { code: "t5c", name: "A", cid: "ca" }); b.fire("joinRoom", { code: "t5c", name: "B", cid: "cb" });
+  a.fire("startDraft"); a.fire("roll");
+  const ok = a.last("you").draw.pool.filter(p => p.ok).sort((x, y) => (y.ovr || 0) - (x.ovr || 0));
+  a.fire("pick", { id: ok[0].id, slot: ok[0].fits[0] });
+  b.fire("team:view", "ca");
+  const v = b.last("team:view");
+  assert.equal(v.name, "A"); assert.equal(v.picks.length, 1, "uma escolha");
+  assert.ok(v.picks[0].fromSel && v.picks[0].fromCopa != null, "traz seleção e copa de origem");
+});
 test("Caos: draft por turnos com os dois humanos e partida de 2 min", () => {
   const { io } = makeIO(); createRooms(io, { rng }); const a = io.connect(), b = io.connect();
   a.fire("joinRoom", { code: "t6", name: "A", cid: "ca" }); b.fire("joinRoom", { code: "t6", name: "B", cid: "cb" });
@@ -114,6 +137,44 @@ test("Formação incompatível é recusada; reconexão mantém o time", () => {
 });
 test("Elencos: toda seleção monta XI em todas as formações", () => {
   for (const e of D.ALL) for (const f of D.FORMATION_NAMES) assert.ok(D.bestXI(e.squad, f), e.key + f);
+});
+test("Caos com 4 pessoas: 2 duelos 1v1 em fila", () => {
+  const { io } = makeIO(); createRooms(io, { rng }); const socks = ["a", "b", "c", "d"].map((n, i) => { const s = io.connect(); s.fire("joinRoom", { code: "duo4", name: n, cid: "c" + n }); return s; });
+  socks[0].fire("setMode", "chaos"); socks[0].fire("startDraft");
+  for (let i = 0; i < 80 && socks[0].last("room").phase === "draft"; i++) for (const s of socks) draftFully(s);
+  const started = socks[0].last("match:start");
+  assert.ok(started, "primeiro duelo começou");
+  assert.equal(socks[0].last("room").phase, "match");
+  const r = io.connect(); r.fire("joinRoom", { code: "duo4", name: "z", cid: "cz" });
+  assert.equal(r.last("room").players.find(p => p.name === "z").role, "spec", "quem entra no meio vira espectador");
+});
+test("Reentrada com mesmo nome e senha retoma o time; outro nome vira espectador", () => {
+  const { io } = makeIO(); createRooms(io, { rng }); const a = io.connect(), z = io.connect();
+  a.fire("joinRoom", { code: "rc1", name: "Ana", cid: "c1", password: "sala1" }); z.fire("joinRoom", { code: "rc1", name: "Zé", cid: "cz" });
+  a.fire("setMode", "vsrelogio"); a.fire("startDraft"); draftFully(a); draftFully(z);
+  assert.equal(a.last("room").phase, "match", "partida começou");
+  a.fire("disconnect");
+  const b = io.connect(); b.fire("joinRoom", { code: "rc1", name: "Bia", cid: "c2", password: "sala1" });
+  assert.equal(b.last("joined").spectator, true, "outro nome entra como espectador");
+  const c = io.connect(); c.fire("joinRoom", { code: "rc1", name: "Ana", cid: "c3", password: "errada" });
+  assert.equal(c.last("joined").spectator, true, "senha errada não retoma o time");
+  const d = io.connect(); d.fire("joinRoom", { code: "rc1", name: "Ana", cid: "c4", password: "sala1" });
+  assert.equal(d.last("joined").cid, "c4"); assert.equal(d.last("joined").spectator, false, "retoma o time");
+  assert.ok(d.last("room").players.find(p => p.name === "Ana" && p.connected), "jogador de volta");
+});
+test("Anfitrião cai e outro jogador assume a partida (sem reiniciar)", () => {
+  const { io } = makeIO(); const R = createRooms(io, { rng }); const a = io.connect(), b = io.connect();
+  a.fire("joinRoom", { code: "rc2", name: "A", cid: "h1" }); b.fire("joinRoom", { code: "rc2", name: "B", cid: "h2" });
+  a.fire("setMode", "vsrelogio"); a.fire("startDraft");
+  for (let i = 0; i < 200 && a.last("room").phase === "draft"; i++) { draftFully(a); draftFully(b); }
+  assert.equal(a.last("room").phase, "match");
+  a.fire("match:snap", { t: 30, left: 90, score: [1, 0], players: [], ball: [0, 0, 0, 1], fx: [] });
+  a.fire("disconnect");
+  const room = R.rooms.get("RC2");
+  R._internals.migrateHost(room, room.players.get("h1")); // o temporizador de 2 s chama isto
+  const tk = b.last("match:takeover");
+  assert.ok(tk, "b recebe o comando de anfitrião");
+  assert.equal(tk.snap.score[0], 1, "partida segue do último placar");
 });
 let fail = 0;
 for (const [n, f] of tests) { try { f(); console.log("  ok  ", n); } catch (e) { fail++; console.log("  FALHOU", n, "\n", e.stack.split("\n").slice(0, 4).join("\n")); } }

@@ -11,9 +11,17 @@
     keeperboom: { label: "EXPLOSÃO DO GOLEIRO", dur: 3 }, earthquake: { label: "TERREMOTO", dur: 8 }, swap: { label: "TROCA DE POSIÇÕES", dur: 3 },
     power: { label: "CHUTE PODEROSO", dur: 12 }, bighead: { label: "MODO CABEÇÃO", dur: 15 }, invert: { label: "INVERSÃO", dur: 10 },
     meteor: { label: "METEORO", dur: 15 }, fire: { label: "FOGO", dur: 15 }, dogs: { label: "CACHORRO", dur: 15 },
-    youplay: { label: "VOCÊ JOGA", dur: 9999 }, heavy: { label: "BOLA PESADA", dur: 12 }, jump: { label: "PULO", dur: 50 }, allgk: { label: "TODO MUNDO É GOLEIRO", dur: 15 }, explosive: { label: "BOLA EXPLOSIVA", dur: 16 }, gplayers: { label: "MODO GIGANTE", dur: 14 }, ants: { label: "MODO FORMIGA", dur: 14 }
+    youplay: { label: "VOCÊ JOGA", dur: 9999 }, heavy: { label: "BOLA PESADA", dur: 12 }, jump: { label: "PULO", dur: 50 }, allgk: { label: "TODO MUNDO É GOLEIRO", dur: 15 }, explosive: { label: "BOLA EXPLOSIVA", dur: 16 }, gplayers: { label: "MODO GIGANTE", dur: 14 }, ants: { label: "MODO FORMIGA", dur: 14 },
+    backgoal: { label: "GOL DE COSTAS", dur: 12 }, goalban: { label: "GOL PROIBIDO", dur: 10 }, movinggoals: { label: "META MÓVEL", dur: 16 }, invisball: { label: "BOLA INVISÍVEL", dur: 12 },
+    upside: { label: "FUTEBOL DE CABEÇA PARA BAIXO", dur: 12 }, randomball: { label: "GOL ALEATÓRIO", dur: 2 }, pulledarea: { label: "PÊNALTI COLETIVO", dur: 3 },
+    onevsall: { label: "UM CONTRA TODOS", dur: 10 }, splitball: { label: "BOLA DIVIDIDA", dur: 12 }, negativegoal: { label: "GOL VALENDO NEGATIVO", dur: 12 },
+    ops: { label: "OPS!", dur: 3 }, dance: { label: "DANCINHA DO NADA", dur: 6 }, lag: { label: "EFEITO LAG", dur: 12 }, fifa: { label: "MODO FIFA", dur: 12 },
+    picolo: { label: "PICOLO", dur: 6 }, theend: { label: "O FIM", dur: 6 }
   };
   const CHAOS_LIST = Object.keys(CHAOS).filter(k => k !== "youplay");
+  const ZX = 6, ZZ = 4; // mapa de calor: 6 × 4 zonas do campo
+  const blankStats = () => ({ shots: 0, passes: 0, passOk: 0, tackles: 0, tackleWon: 0, saves: 0, poss: 0 });
+  const blankPlayerStats = () => ({ shots: 0, passes: 0, passOk: 0, tackles: 0, tackleWon: 0, dist: 0, heat: new Array(ZX * ZZ).fill(0) });
 
   class Match {
     constructor(cfg, o = {}) {
@@ -21,10 +29,12 @@
       this.seconds = cfg.seconds || 120; this.t = 0; this.score = [0, 0]; this.goals = []; this.events = [];
       this.kind = cfg.kind; this.chaosOn = !!cfg.chaos; this.golden = false; this.ended = false; this.pause = 0; this.pauseNext = null; this.restartTeam = 0;
       this.fx = {}; this.ents = []; this.youPlay = false; this.chaosNext = 20; this.totalChaos = false; this.entId = 0; this.quake = 0;
-      this.dev = { timeScale: 1, speed: 1, kick: 1, keep: {} }; // devmode (Konami): multiplicadores e eventos mantidos
+      this.dev = { timeScale: 1, speed: 1, kick: 1, keep: {} }; this.opsList = []; this.solo = null; this.picoloP = null; this.fifaT = 0;
+      this.stats = [blankStats(), blankStats()]; // devmode (Konami): multiplicadores e eventos mantidos
       this.players = []; this.ball = { x: 0, y: BALL_R, z: 0, vx: 0, vy: 0, vz: 0, owner: null, lastTeam: 0, lastP: null, lock: null, scale: 1, spin: 0, beaten: false, fuse: 0 };
       this.ctrl = [{ pid: -1, in: null, charge: 0, wasShoot: false }, { pid: -1, in: null, charge: 0, wasShoot: false }];
       for (let t = 0; t < 2; t++) cfg.teams[t].lineup.forEach((lp, i) => this.players.push(this.makePlayer(t, i, lp, cfg.teams[t])));
+      for (const p of this.players) p.s = blankPlayerStats();
       this.kickoff(0);
     }
     makePlayer(t, i, lp, team) {
@@ -54,11 +64,15 @@
       const b = this.ball, shooting = p.st.shooting / 100, skill = kindOfKick === "shot" ? shooting : p.st.passing / 100;
       let ang = Math.atan2(tz - b.z, tx - b.x) + (this.rng() - .5) * (1 - skill) * (kindOfKick === "shot" ? .5 : .3) * 1.4;
       if (this.fx.power) speed *= 2; if (this.fx.heavy) speed *= .5; speed *= this.dev.kick;
+      if (kindOfKick === "shot") { this.stats[p.team].shots++; p.s.shots++; } else if (kindOfKick === "pass") { this.stats[p.team].passes++; p.s.passes++; }
+      b.kickedPass = kindOfKick === "pass";
       if (p.fx === "power" && kindOfKick === "shot") speed *= 1.12;
       b.vx = Math.cos(ang) * speed; b.vz = Math.sin(ang) * speed; b.vy = lift; b.owner = null; b.lastTeam = p.team; b.lastP = p; b.beaten = false; b.lock = null;
       p.cdKick = .5; p.holdT = 0; this.emit({ type: "kick", power: speed });
     }
+    facesAway(p) { const d = this.dir(p.team), fx = Math.sin(p.rot), fz = Math.cos(p.rot); return fx * (d * L - p.x) + fz * (-p.z) < 0; }
     shootAt(p, charge) { // charge 0..1
+      if (this.fx.backgoal && !this.facesAway(p)) { if (p.holdT > 2.5) this.kick(p, this.dir(p.team) * L, (this.rng() - .5) * 10, 14, 0, "pass"); return; }
       const d = this.dir(p.team), gx = d * L, spread = GOAL_HW * .8, tz = (p.aimZ != null ? clamp(p.aimZ, -1, 1) * spread : (this.rng() - .5) * spread * 1.4);
       const speed = (17 + (p.st.shooting - 50) / 50 * 5 + charge * 11) * (this.human[p.team] && this.ctrl[p.team].pid === p.id ? 1 : 1);
       this.kick(p, gx, tz, speed, (this.rng() < .3 + charge * .3 ? 3.2 + charge * 3 : 0), "shot");
@@ -99,6 +113,7 @@
       if (goalDist > 34 && q && this.rng() < .2) this.passTo(p, q, false);
     }
     aiTarget(p, ctx) {
+      if (this.fx.theend && p.cornerX != null) return [p.cornerX, p.cornerZ, 1];
       const b = this.ball, d = this.dir(p.team), mine = ctx[p.team], own = b.owner && b.owner.team === p.team, opp = b.owner && b.owner.team !== p.team;
       if (p.sector === "G") { // goleiro
         const gx = -d * (L - 2.4);
@@ -107,6 +122,7 @@
         if (!own && b.vx * -d > 3 && Math.abs(b.x - gx) < 30) { const t = Math.abs(b.x - gx) / Math.abs(b.vx); tz = clamp(b.z + b.vz * t, -GOAL_HW, GOAL_HW); return [gx + d * Math.min(2.2, Math.abs(b.x - gx) * .1), tz, 1.15]; }
         return [gx + d * Math.min(2.5, Math.abs(b.x - gx) * .08), tz, .8];
       }
+      if (this.fx.onevsall && this.solo && !this.solo.dead && p.team !== this.solo.team && !own) return [this.solo.x, this.solo.z, 1];
       if (this.fx.invert) { const m = ctx.mirror; return [p.hx * -1 + b.x * .2, p.hz * -1, .8]; }
       if (mine.chaser[0] === p || (opp && mine.chaser[1] === p && p.sector !== "A")) {
         if (opp && mine.chaser[0] !== p) { const o = b.owner; return [o.x + (-d * 3), o.z * .9, 1]; }
@@ -122,13 +138,14 @@
     }
     moveToward(p, tx, tz, mul, dt) {
       if (p.confT > 0) { p.confT -= dt; tx = p.x + Math.sin(this.t * 6 + p.idx) * 6; tz = p.z + Math.cos(this.t * 5 + p.idx) * 6; }
-      const dx = tx - p.x, dz = tz - p.z, dist = hyp(dx, dz) || 1, max = p.maxSpeed * mul * (this.fx.gplayers ? .55 : 1) * (this.fx.ants ? 1.8 : 1) * (this.fx.speed ? 1.9 : 1) * (p.slowT > 0 ? .5 : 1) * this.dev.speed;
+      if (p.danceT > 0) { p.vx = p.vz = 0; return; }
+      const dx = tx - p.x, dz = tz - p.z, dist = hyp(dx, dz) || 1, max = p.maxSpeed * mul * (this.fx.gplayers ? .55 : 1) * (this.fx.ants ? 1.8 : 1) * (this.fx.speed ? 1.9 : 1) * (p.slowT > 0 ? .5 : 1) * this.dev.speed * (this.fx.onevsall && p === this.solo ? 2.2 : 1) * (this.fx.picolo && p === this.picoloP ? 1.8 : 1);
       const sp = Math.min(max, dist * 3.2), wx = dx / dist * sp, wz = dz / dist * sp, acc = (this.fx.slippery ? 7 : 38) * dt;
       p.vx += clamp(wx - p.vx, -acc, acc); p.vz += clamp(wz - p.vz, -acc, acc);
     }
 
     // ---------- humanos ----------
-    input(team, inp) { this.ctrl[team].in = inp; }
+    input(team, inp) { if (inp && this.fx.upside) inp = { ...inp, dx: -inp.dx, dz: -inp.dz }; this.ctrl[team].in = inp; }
     controlled(team) { const c = this.ctrl[team]; return c.pid >= 0 ? this.players[c.pid] : null; }
     updateHumanSelection(team) {
       const c = this.ctrl[team], active = this.human[team] || this.youPlay && this.human[team]; if (!active) { c.pid = -1; return; }
@@ -157,8 +174,9 @@
     tackle(p, human) {
       if (p.cdTackle > 0) return; p.cdTackle = human ? .8 : .7;
       const o = this.ball.owner; if (!o || o.team === p.team || hyp(o.x - p.x, o.z - p.z) > (human ? 2.4 : 1.5)) return;
+      this.stats[p.team].tackles++; p.s.tackles++;
       const odrib = (o.st.speed + o.st.passing) / 2, chance = clamp(.34 + (p.st.defending - odrib) / 170 + (human ? .14 : 0), .1, .78);
-      if (this.rng() < chance) { const b = this.ball; b.owner = null; b.lastTeam = p.team; b.lastP = p; const a = Math.atan2(p.x - o.x, p.z - o.z) + (this.rng() - .5); b.vx = Math.sin(a) * 6; b.vz = Math.cos(a) * 6; o.cdKick = .6; o.stun = .5; b.lock = null; }
+      if (this.rng() < chance) { this.stats[p.team].tackleWon++; p.s.tackleWon++; const b = this.ball; b.owner = null; b.lastTeam = p.team; b.lastP = p; const a = Math.atan2(p.x - o.x, p.z - o.z) + (this.rng() - .5); b.vx = Math.sin(a) * 6; b.vz = Math.cos(a) * 6; o.cdKick = .6; o.stun = .5; b.lock = null; }
     }
 
     // ---------- passo principal ----------
@@ -168,7 +186,8 @@
       for (const p of this.players) { p.cdKick = Math.max(0, p.cdKick - dt); p.cdTackle = Math.max(0, p.cdTackle - dt); p.slowT = Math.max(0, p.slowT - dt); p.stun = Math.max(0, p.stun - dt); }
       if (this.pause > 0) { this.pause -= dt; this.settle(dt); this.stepEnts(dt); if (this.pause <= 0) { const n = this.pauseNext; this.pauseNext = null; if (n === "end") return this.finish(); this.kickoff(n == null ? 0 : n); } return; }
       this.t += dt;
-      const b = this.ball;
+      const b = this.ball, bt = b.owner ? b.owner.team : b.lastTeam; this.stats[bt].poss += dt;
+      for (const p of this.players) { if (p.dead) continue; p.s.dist += hyp(p.vx, p.vz) * dt; const zx = clamp(Math.floor((p.x + L) / (2 * L) * ZX), 0, ZX - 1), zz = clamp(Math.floor((p.z + W) / (2 * W) * ZZ), 0, ZZ - 1); p.s.heat[zz * ZX + zx] += dt; }
       // contexto dos times: quem persegue a bola
       const ctx = [{ chaser: [] }, { chaser: [] }], key = b.owner || { x: b.x + b.vx * .35, z: b.z + b.vz * .35 };
       for (let t = 0; t < 2; t++) ctx[t].chaser = this.players.filter(p => p.team === t && p.sector !== "G" && !p.dead && p.mode === "ok" && p.stun <= 0 && !(b.owner && b.owner.team === t))
@@ -201,6 +220,21 @@
           else this.finish();
         }
       }
+    }
+    goalZ() { return this.fx.movinggoals ? Math.sin(this.t * .35) * 9 : 0; }
+    // Efeitos com lógica por quadro: OPS (cai, chora e vira bola de sinuca), FIFA (faltas), PICOLO (aura).
+    stepNewFx(dt) {
+      for (const p of this.players) p.danceT = Math.max(0, (p.danceT || 0) - dt);
+      this.opsList = this.opsList.filter(o => {
+        o.t -= dt; if (o.t > 0) return true;
+        const p = o.p; if (p.dead) return false;
+        const d = this.dir(p.team); p.dead = true; p.mode = "ok";
+        this.ents.push({ id: ++this.entId, k: "snooker", x: p.x, y: 0.9, z: p.z, vx: d * 15, vz: 0, rot: 0, life: 9 });
+        return false;
+      });
+      if (this.fx.fifa) { this.fifaT -= dt; if (this.fifaT <= 0) { this.fifaT = 2 + this.rng() * 2; const p = this.randomPlayer(q => q !== this.ball.owner && q.sector !== "G"); if (p) { this.knockDown(p, 1.4); this.emit({ type: "shout", text: ["FALTA!", "PÊNALTI!", "ME ENCOSTOU!", "IMPOSSÍVEL!"][Math.floor(this.rng() * 4)] }); } } }
+      const a = this.picoloP;
+      if (this.fx.picolo && a && !a.dead && a.mode === "ok") for (const o of this.players) if (o.team !== a.team && !o.dead && o.mode === "ok" && hyp(o.x - a.x, o.z - a.z) < 2.6) this.knockDown(o, 1e9);
     }
     // Comandos do devmode (enviados pelo anfitrião). Só valores válidos são aceitos.
     applyDev(c) {
@@ -274,7 +308,7 @@
       b.spin += hyp(b.vx, b.vz) * dt;
       // gol / linhas
       if (Math.abs(b.x) > L) {
-        if (Math.abs(b.z) < GOAL_HW && b.y < GOAL_H) return this.goal(b.x > 0 ? 0 : 1);
+        if (Math.abs(b.z - this.goalZ()) < GOAL_HW && b.y < GOAL_H) return this.goal(b.x > 0 ? 0 : 1);
         const defTeam = b.x > 0 ? 1 : 0, last = b.lastTeam;
         if (last === defTeam) this.restart("corner", 1 - defTeam, Math.sign(b.x) * (L - .8), Math.sign(b.z || 1) * (W - .8));
         else this.restart("goalkick", defTeam, Math.sign(b.x) * (L - 6), clamp(b.z, -6, 6) * .5);
@@ -288,7 +322,7 @@
         if (b.lock && b.lock.team === gk.team || hyp(b.vx, b.vz) < 9) { if (gk.cdKick <= 0) { b.owner = gk; b.vx = b.vz = 0; gk.holdT = 0; gk.cdDecide = .3; } continue; }
         if (b.lastTeam !== gk.team && !b.beaten) {
           const shooter = b.lastP, sh = shooter ? shooter.st.shooting : 70, pSave = clamp(.84 + (gk.st.keeping - sh) / 95 + (gk.fx === "wall" ? .12 : 0) - Math.min(.25, hyp(b.vx, b.vz) / 160), .06, .85);
-          if (this.rng() < pSave) { if (this.rng() < .55) { b.owner = gk; b.vx = b.vz = 0; gk.holdT = 0; gk.cdDecide = .3; } else { const a = (this.rng() - .5) * 2.6 + (gk.team === 0 ? 0 : Math.PI); b.vx = Math.cos(a) * 9; b.vz = Math.sin(a) * 9; b.vy = 3; b.lastTeam = gk.team; b.lastP = gk; } this.emit({ type: "save", x: gk.x, z: gk.z }); }
+          if (this.rng() < pSave) { this.stats[gk.team].saves++; if (this.rng() < .55) { b.owner = gk; b.vx = b.vz = 0; gk.holdT = 0; gk.cdDecide = .3; } else { const a = (this.rng() - .5) * 2.6 + (gk.team === 0 ? 0 : Math.PI); b.vx = Math.cos(a) * 9; b.vz = Math.sin(a) * 9; b.vy = 3; b.lastTeam = gk.team; b.lastP = gk; } this.emit({ type: "save", x: gk.x, z: gk.z }); }
           else b.beaten = true;
         }
       }
@@ -300,26 +334,34 @@
         if (d < reach && b.y < 2 && spd < 24 && d < bd) { bd = d; best = p; }
       }
       for (const p of this.players) if (p.expect > 0) p.expect -= dt;
-      if (best) { b.owner = best; best.holdT = 0; best.cdDecide = .12 + this.rng() * .2; b.lastTeam = best.team; b.lastP = best; b.beaten = false; b.lock = null; this.emit({ type: "touch" }); }
+      if (best) { if (b.kickedPass && b.lastP && b.lastP !== best && b.lastP.team === best.team) { this.stats[best.team].passOk++; b.lastP.s.passOk++; } b.kickedPass = false; b.owner = best; best.holdT = 0; best.cdDecide = .12 + this.rng() * .2; b.lastTeam = best.team; b.lastP = best; b.beaten = false; b.lock = null; this.emit({ type: "touch" }); }
     }
     goal(team) {
-      this.score[team]++; const p = this.ball.lastP && this.ball.lastTeam === team ? this.ball.lastP : this.players.filter(q => q.team === team && q.sector === "A")[0] || this.players[team * 11 + 9];
+      this.score[team] += this.fx.negativegoal ? -1 : 1; const p = this.ball.lastP && this.ball.lastTeam === team ? this.ball.lastP : this.players.filter(q => q.team === team && q.sector === "A")[0] || this.players[team * 11 + 9];
       const own = this.ball.lastTeam !== team, who = own ? this.players.find(q => q.team === 1 - team && q.sector === "D") || p : p;
       const g = { team, min: this.minute(), player: who.name, own: own && this.ball.lastP && this.ball.lastP.team !== team }; this.goals.push(g);
       this.emit({ type: "goal", team, player: g.player, minute: g.min, score: this.score.slice(), pid: who.id });
+      if (this.fx.goalban) who.stun = 4; // gol proibido: quem marcou fica paralisado
       this.ball.vx = this.ball.vz = 0; this.ball.owner = null; this.ball.x = Math.sign(this.ball.x) * (L + .5);
       if (this.golden) { this.pause = 3; this.pauseNext = "end"; } else { this.pause = 3; this.pauseNext = 1 - team; }
     }
-    finish() { this.ended = true; this.emit({ type: "end", score: this.score.slice(), goals: this.goals.slice() }); }
+    finish() { this.ended = true; this.emit({ type: "end", score: this.score.slice(), goals: this.goals.slice(), stats: this.statsOut() }); }
+    statsOut() {
+      const tot = this.stats[0].poss + this.stats[1].poss || 1;
+      const teams = this.stats.map(t => ({ shots: t.shots, passes: t.passes, passOk: t.passOk, passPct: t.passes ? Math.round(t.passOk / t.passes * 100) : 0, tackles: t.tackles, tackleWon: t.tackleWon, saves: t.saves, possession: Math.round(t.poss / tot * 100) }));
+      const players = this.players.map(p => ({ id: p.id, name: p.name, team: p.team, shots: p.s.shots, passes: p.s.passes, passOk: p.s.passOk, tackles: p.s.tackles, tackleWon: p.s.tackleWon, dist: Math.round(p.s.dist), heat: p.s.heat.map(v => Math.round(v * 10) / 10) }));
+      return { teams, players };
+    }
     result() { return { score: this.score.slice(), goals: this.goals.slice(), ended: this.ended }; }
 
     // ---------- CAOS ----------
     stepChaos(dt) {
-      for (const k of Object.keys(this.fx)) { if (this.dev.keep[k]) continue; this.fx[k] -= dt; if (this.fx[k] <= 0) { delete this.fx[k]; this.emit({ type: "chaosEnd", name: k }); if (k === "giant" || k === "small") this.ball.scale = 1; if (k === "explosive") this.ball.fuse = 0; } }
-      this.quake = this.fx.earthquake ? 1 : 0;
+      for (const k of Object.keys(this.fx)) { if (this.dev.keep[k]) continue; this.fx[k] -= dt; if (this.fx[k] <= 0) { delete this.fx[k]; this.emit({ type: "chaosEnd", name: k }); if (k === "giant" || k === "small" || k === "splitball") this.ball.scale = 1; if (k === "explosive") this.ball.fuse = 0; } }
+      this.quake = this.fx.earthquake || this.fx.theend ? 1 : 0;
       if (this.fx.explosive && this.ball.fuse > 0) { this.ball.fuse -= dt; if (this.ball.fuse <= 0) this.explode(); }
       if (this.pause > 0) return;
       for (const k of Object.keys(this.dev.keep)) if (this.dev.keep[k] && !this.fx[k]) this.triggerChaos(k);
+      this.stepNewFx(dt);
       const left = this.seconds - this.t;
       // Cronograma: no 1º minuto um evento a cada 20 s; no último minuto, a cada 10 s.
       // No máximo 2 efeitos ativos ao mesmo tempo, para não acumular tudo de uma vez.
@@ -340,6 +382,13 @@
       if (name === "youplay") { this.youPlay = true; this.cfg.humanControl = true; return; }
       this.fx[name] = def.dur;
       switch (name) {
+        case "randomball": b.x = (this.rng() - .5) * L * 1.7; b.z = (this.rng() - .5) * W * 1.5; b.y = BALL_R; b.vx = b.vy = b.vz = 0; b.owner = null; b.lock = null; break;
+        case "pulledarea": { const side = b.x >= 0 ? 1 : -1; b.owner = null; for (const p of this.players) { if (p.dead) continue; p.x = side * (L - 3 - this.rng() * 9); p.z = clamp(b.z + (this.rng() - .5) * 18, -W + 2, W - 2); p.vx = p.vz = 0; } break; }
+        case "onevsall": this.solo = this.randomPlayer(q => q.sector !== "G"); break;
+        case "picolo": this.picoloP = this.randomPlayer(q => q.sector !== "G"); break;
+        case "ops": { const p = this.randomPlayer(q => q.sector !== "G"); if (p) { this.knockDown(p, 1e9); this.opsList.push({ p, t: 10 }); } break; }
+        case "dance": { const p = this.randomPlayer(q => q.sector !== "G"); if (p) { p.danceT = 6; for (const q of this.players) if (q !== p && !q.dead && hyp(q.x - p.x, q.z - p.z) < 14) q.danceT = 6; } break; }
+        case "theend": for (const p of this.players) { p.cornerX = this.rng() < .5 ? -L + 3 : L - 3; p.cornerZ = this.rng() < .5 ? -W + 3 : W - 3; } break;
         case "explosive": b.fuse = 4; break; case "giant": b.scale = 2.8; break; case "small": b.scale = .3; break;
         case "keeperboom": { const k = this.randomPlayer(p => p.sector === "G"); if (k) { k.dead = true; if (b.owner === k) b.owner = null; this.emit({ type: "boom", x: k.x, z: k.z }); } break; }
         case "swap": for (let t = 0; t < 2; t++) { const f = this.players.filter(p => p.team === t && p.sector !== "G"), xs = f.map(p => [p.hx, p.hz]); for (let i = xs.length - 1; i > 0; i--) { const j = Math.floor(this.rng() * (i + 1)); [xs[i], xs[j]] = [xs[j], xs[i]]; } f.forEach((p, i) => { p.hx = xs[i][0]; p.hz = xs[i][1]; }); } break;
@@ -355,6 +404,7 @@
         e.life -= dt; if (e.life <= 0) continue;
         if (e.k === "meteor") { if (!e.landed) { e.y += e.vy * dt; if (e.y <= 1) { e.y = .9; e.landed = true; this.emit({ type: "impact", x: e.x, z: e.z }); for (const p of this.players) if (!p.dead && hyp(p.x - e.x, p.z - e.z) < 3) this.knockDown(p, 2.3); } } else { for (const p of this.players) if (!p.dead && p.mode === "ok" && hyp(p.x - e.x, p.z - e.z) < 1.5) { p.confT = 2; } } }
         else if (e.k === "ball") { e.vy -= 17 * dt; e.x += e.vx * dt; e.y += e.vy * dt; e.z += e.vz * dt; if (e.y < .6) { e.y = .6; e.vy = Math.abs(e.vy) > 3 ? -e.vy * .55 : 0; e.vx *= .985; e.vz *= .985; for (const p of this.players) if (!p.dead && p.mode === "ok" && e.y < 1.6 && hyp(p.x - e.x, p.z - e.z) < 1.2 && hyp(e.vx, e.vz) + Math.abs(e.vy) > 5) this.knockDown(p, 1); } e.x = clamp(e.x, -L, L); e.z = clamp(e.z, -W, W); }
+        else if (e.k === "snooker") { e.x += e.vx * dt; e.z += e.vz * dt; e.rot += dt * 8; e.life = Math.min(e.life, Math.abs(e.x) > L + 3 ? 0 : e.life); }
         else if (e.k === "dog") { const t = this.ball.owner || this.ball, dx = t.x - e.x, dz = t.z - e.z, d = hyp(dx, dz) || 1; e.vx = dx / d * 6.5; e.vz = dz / d * 6.5; e.x += e.vx * dt; e.z += e.vz * dt; e.rot = Math.atan2(e.vx, e.vz); for (const p of this.players) if (!p.dead && p.mode === "ok" && hyp(p.x - e.x, p.z - e.z) < 1.4) { this.knockDown(p, 2); e.x += (this.rng() - .5) * 8; e.z += (this.rng() - .5) * 8; } }
         else if (e.k === "torch") { e.x += e.vx * dt; e.z += e.vz * dt; e.acc += dt; if (e.acc > .35) { e.acc = 0; this.ents.push({ id: ++this.entId, k: "flame", x: e.x, y: 0, z: e.z, r: .8, life: 9 }); } if (Math.abs(e.z) > W + 3) e.life = 0; }
         else if (e.k === "flame") { e.r = Math.min(2.6, e.r + dt * .35); for (const p of this.players) if (!p.dead && hyp(p.x - e.x, p.z - e.z) < e.r + .3) { p.dead = true; if (this.ball.owner === p) this.ball.owner = null; this.emit({ type: "burn", x: p.x, z: p.z }); } }
@@ -364,11 +414,14 @@
     }
 
     // ---------- estado para renderização / rede ----------
+    // Efeito lag: posições chegam em saltos (grade de 1,2 m). Bola dividida: três bolinhas decorativas girando em volta.
+    snapPos(v) { return this.fx.lag ? Math.round(v / 1.2) * 1.2 : v; }
+    miniBalls() { if (!this.fx.splitball) return []; const b = this.ball, out = []; for (let i = 0; i < 3; i++) { const a = this.t * 4 + i * 2.094; out.push(["miniball", b.x + Math.cos(a) * 1.6, b.y, b.z + Math.sin(a) * 1.6, 0, 0, -1 - i]); } return out; }
     state() {
       const b = this.ball, ctrlIds = [this.ctrl[0].pid, this.ctrl[1].pid];
-      return { t: this.t, left: Math.max(0, this.seconds - this.t), score: this.score.slice(), golden: this.golden, pause: this.pause > 0, total: this.totalChaos, quake: this.quake, youPlay: this.youPlay, fx: Object.keys(this.fx),
-        players: this.players.map(p => [p.x, p.y, p.z, p.rot, p.anim, p.mode === "down" ? p.tilt : (p.diveT > 0 ? 1 : 0), (p.dead ? 1 : 0) | (this.fx.bighead ? 2 : 0) | (ctrlIds.includes(p.id) ? 4 : 0) | (b.owner === p ? 8 : 0) | (this.fx.allgk && p.sector !== "G" && !p.dead ? 16 : 0), this.scaleOf(p)]),
-        ball: [b.x, b.y, b.z, b.scale, b.spin, b.fuse || 0], ents: this.ents.map(e => [e.k, e.x, e.y, e.z, e.rot || 0, e.r || 0, e.id]) };
+      return { t: this.t, goalZ: this.goalZ(), left: Math.max(0, this.seconds - this.t), score: this.score.slice(), golden: this.golden, pause: this.pause > 0, total: this.totalChaos, quake: this.quake, youPlay: this.youPlay, fx: Object.keys(this.fx),
+        players: this.players.map(p => [this.snapPos(p.x), p.y, this.snapPos(p.z), p.rot, p.anim, p.mode === "down" ? p.tilt : (p.diveT > 0 ? 1 : 0), (p.dead ? 1 : 0) | (this.fx.bighead ? 2 : 0) | (ctrlIds.includes(p.id) ? 4 : 0) | (b.owner === p ? 8 : 0) | (this.fx.allgk && p.sector !== "G" && !p.dead ? 16 : 0) | (p.danceT > 0 ? 32 : 0) | (this.fx.picolo && this.picoloP === p ? 64 : 0), this.scaleOf(p)]),
+        ball: [b.x, b.y, b.z, b.scale, b.spin, b.fuse || 0], ents: [...this.ents.map(e => [e.k, e.x, e.y, e.z, e.rot || 0, e.r || 0, e.id]), ...this.miniBalls()] };
     }
   }
   return { Match, CHAOS, CHAOS_LIST, L, W, GOAL_HW, GOAL_H, BALL_R };

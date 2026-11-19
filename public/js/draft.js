@@ -57,7 +57,7 @@ const Draft = (function () {
     $("lineup").innerHTML = slots.map(([pos], i) => { const p = lineup[i]; return `<div class="lr ${p ? "" : "empty"}"><span>${pos}</span><span>${p ? esc(p.name) : "—"}</span><b>${p ? (almanaque ? "?" : p.ovr) : ""}</b></div>`; }).join("");
     const filled = lineup.filter(Boolean);
     $("teamOvr").textContent = almanaque ? "?" : filled.length ? Math.round(filled.reduce((s, p) => s + p.ovr, 0) / filled.length) : "—";
-    $("others").innerHTML = r.players.filter(p => p.role === "player").map(p => `<div class="oth ${p.cid === G.cid ? "me" : ""}"><span>${esc(p.name)}${p.connected ? "" : " (offline)"}</span><b>${p.count}/11</b></div>`).join("");
+    $("others").innerHTML = r.players.filter(p => p.role === "player").map(p => `<div class="oth ${p.cid === G.cid ? "me" : ""}" data-cid="${esc(p.cid)}" title="Ver o time"><span>${esc(p.name)}${p.connected ? "" : " (offline)"}</span><b>${p.count}/11</b></div>`).join("");
   }
 
   // clique no campo: coloca o jogador selecionado na vaga

@@ -106,3 +106,31 @@ input{background:var(--bg);color:var(--text);border:1px solid var(--line);border
 .dev-slider{display:grid;gap:4px;margin-top:8px}
 .dev-slider output{float:right;opacity:.8}
 .dev-slider input{width:100%}
+
+/* estatísticas do fim da partida */
+.res-stats{margin-top:12px;max-height:46vh;overflow:auto;text-align:left;width:min(640px,100%)}
+.stat-table{width:100%;border-collapse:collapse;font-size:13px}
+.stat-table th,.stat-table td{padding:4px 6px;border-bottom:1px solid rgba(127,127,127,.25)}
+.stat-table tbody th{text-align:center;opacity:.8;font-weight:600}
+.stat-table tbody td:last-child{text-align:right}.stat-table tbody td:first-child{text-align:left}
+.res-stats h4{margin:12px 0 6px;font-size:12px;letter-spacing:.08em}
+.pl-stat{border-bottom:1px solid rgba(127,127,127,.2);padding:4px 0;font-size:13px}
+.pl-stat summary{cursor:pointer}.pl-stat small{opacity:.7}
+.heat{display:grid;grid-template-columns:repeat(6,1fr);gap:2px;margin:6px 0 4px;max-width:260px}
+.heat i{display:block;aspect-ratio:1.4;background:#e0402c;border-radius:3px}
+
+/* pênaltis em 3D */
+.pen-overlay{position:fixed;inset:0;z-index:70;background:#000}
+.pen-overlay canvas{position:absolute;inset:0;width:100%!important;height:100%!important}
+.pen-hud{position:absolute;top:12px;left:0;right:0;text-align:center;color:#fff;text-shadow:0 2px 6px #000;pointer-events:none}
+.pen-title{font-weight:800;letter-spacing:.12em}
+.pen-score{font-size:20px;font-weight:700;margin-top:4px}
+.pen-line{font-size:14px;opacity:.9;margin-top:4px}
+.pen-banner{position:absolute;left:0;right:0;top:42%;text-align:center;font-size:56px;font-weight:900;color:#fff;text-shadow:0 4px 14px #000;opacity:0;transition:opacity .2s}
+.pen-banner.show{opacity:1}.pen-banner.gol{color:#ffd60a}.pen-banner.def{color:#7ee787}.pen-banner.out{color:#ff7b72}
+.pen-pick{position:fixed;inset:0;z-index:75;background:rgba(5,10,20,.75);display:grid;place-items:center;padding:16px}
+.pen-card{width:min(440px,100%);max-height:88vh;overflow:auto;background:var(--panel,#fff);color:var(--ink,#0b1d33);border-radius:14px;padding:16px}
+.pen-list{display:grid;gap:6px;margin:10px 0}
+.pen-row{text-align:left;padding:8px 10px;border-radius:8px;border:1px solid rgba(127,127,127,.4);background:transparent;color:inherit;cursor:pointer}
+.pen-row.on{border-color:#2f6fdc;background:rgba(47,111,220,.12)}
+.pen-row small{opacity:.7}

@@ -18,7 +18,7 @@
     code = (code || $("roomCode").value || "").trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
     if (!code) { code = code6(); $("roomCode").value = code; }
     store.set("6a7Room", code); G.room = { code }; G.pendingMode = G.mode; Sound.ensure(); $("homeStatus").textContent = "Entrando na sala…";
-    emit("joinRoom", { code, name: G.name, cid: G.cid });
+    G.pass = ($("roomPass") || {}).value || ""; emit("joinRoom", { code, name: G.name, cid: G.cid, password: G.pass });
   }
   $("joinBtn").onclick = () => join(); $("soloBtn").onclick = () => join(code6());
   $("roomCode").addEventListener("keydown", e => { if (e.key === "Enter") join(); });
@@ -41,8 +41,21 @@
   G.socket.on("match:snap", s => View3D.onSnap(s));
   G.socket.on("match:event", e => View3D.onEvent(e));
   G.socket.on("match:input", m => View3D.onRemoteInput(m));
+  // Ver o time de um colega durante o draft (clicando no nome dele na lista).
+  document.getElementById("others").addEventListener("click", e => { const el = e.target.closest(".oth"); if (el && el.dataset.cid && el.dataset.cid !== G.cid) G.socket.emit("team:view", el.dataset.cid); });
+  G.socket.on("team:view", d => {
+    const rows = d.picks.length ? d.picks.map((x, i) => `<li><b>${i + 1}.</b> ${esc(x.name)} <small>${esc(x.pos || "")} · ${x.ovr ?? "—"}</small><br><small>Seleção: <b>${esc(x.fromSel || "—")}</b> · Copa: ${esc(String(x.fromCopa || "—"))}</small></li>`).join("") : "<li>Nenhuma escolha ainda.</li>";
+    $("modalCard").innerHTML = `<div class="eyebrow">TIME DE ${esc(d.name)}</div><h3>${d.count}/11 · formação ${esc(d.formation || "")}</h3><ol class="team-view">${rows}</ol><div class="join-actions"><button id="backMyTeam" class="primary">MOSTRAR MEU TIME</button><button id="closeTeamView" class="secondary">FECHAR</button></div>`;
+    $("modal").classList.remove("hidden");
+    $("backMyTeam").onclick = () => $("modal").classList.add("hidden");
+    $("closeTeamView").onclick = () => $("modal").classList.add("hidden");
+  });
   G.socket.on("dev:apply", c => View3D.onDevApply(c));
   G.socket.on("match:end", r => View3D.onEnd(r));
+  G.socket.on("match:takeover", d => View3D.onTakeover(d));
+  G.socket.on("pen:select", d => Penalty3D.select(d));
+  G.socket.on("pen:run", d => Penalty3D.run(d));
+  G.socket.on("duel:next", d => toast(`Próximo duelo (${d.n}/${d.total}) em ${d.seconds} s`));
 
   // ----- sala -----
   function renderLobby() {
